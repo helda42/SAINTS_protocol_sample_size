@@ -44,7 +44,7 @@ datPowSalm$EsSd
 datPowSalm
 
 
-pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malnutrition_seroconvert_SBA.pdf",width=16,height=9)
+pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malnutrition_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
   geom_point(size=4) +
   geom_line(lwd=2) +
@@ -62,7 +62,7 @@ dev.off()
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(2000, 2500, 3000),c(0.05, 0.1),c(0.4,0.6),c(0.16))
+gr<-expand.grid(c(1750, 2000, 2225, 2500),c(0.05, 0.1),c(0.4,0.6),c(0.16))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -93,7 +93,7 @@ datPowSalm$EsSd
 datPowSalm
 
 
-pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malaria_seroconvert_SBA.pdf",width=16,height=9)
+pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malaria_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
   geom_point(size=4) +
   geom_line(lwd=2) +
@@ -112,7 +112,7 @@ dev.off()
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(1500, 1750, 2000),c(0.05, 0.1),c(0.4,0.6),c(0.34))
+gr<-expand.grid(c(1750, 2000, 2225, 2500),c(0.05, 0.1),c(0.4,0.6),c(0.34))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -143,7 +143,7 @@ datPowSalm$EsSd
 datPowSalm
 
 
-pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malaria_seroconvert_SBA.pdf",width=16,height=9)
+pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_ananamia_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
   geom_point(size=4) +
   geom_line(lwd=2) +
@@ -161,7 +161,7 @@ dev.off()
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(1500, 1750, 2000),c(0.1, 0.2),c(0.4,0.6),c(0.02))
+gr<-expand.grid(c(1750, 2000, 2225, 2500),c(0.1, 0.2),c(0.4,0.6),c(0.02))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -192,7 +192,7 @@ datPowSalm$EsSd
 datPowSalm
 
 
-pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malaria_seroconvert_SBA.pdf",width=16,height=9)
+pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_sicklecell_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
   geom_point(size=4) +
   geom_line(lwd=2) +
