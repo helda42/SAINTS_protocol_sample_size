@@ -13,7 +13,7 @@ library(ggplot2)
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(1500, 1750, 2000),c(0.1, 0.2),c(0.4,0.6),c(0.03))
+gr<-expand.grid(c(2000, 2225, 2500, 2750, 3000),c(0.1, 0.2),c(0.4,0.6),c(0.03))
 
 datPowSalm<-data.frame(
   alpha=0.05,

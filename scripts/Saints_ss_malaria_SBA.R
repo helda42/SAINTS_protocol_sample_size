@@ -317,10 +317,10 @@ if(is.na(args[2]) | args[2]=="malvacc"){
     return(res)
   }
   
-  gr<-expand.grid(c(2000),c(0.42,0.46,0.5),c(0.1,0.2),c(0.25,0.5,0.75,1))
+  gr<-expand.grid(c(2500),c(0.42,0.46,0.5),c(0.2),c(0.25,0.5,0.75,1))
   datPowMalVacc<-data.frame(
     alpha=0.05,
-    malariaPrev=0.26,
+    malariaPrev=0.16,
     effectSize=gr[,4],
     dirVE=gr[,2],
     indirVE=0.1,
@@ -334,8 +334,8 @@ if(is.na(args[2]) | args[2]=="malvacc"){
   for(j in 1:nrow(datPowMalVacc)){
     cat(paste(sep="","## direct VE = ",datPowMalVacc$dirVE[j],", n = ",datPowMalVacc$n[j],", pDropOut = ",datPowMalVacc$pDropOut[j],", effectSize = ",datPowMalVacc$effectSize[j]," ##\n"))
     
-    #resInt<-rep(NA,B)
-    #resSlp<-rep(NA,B)
+    # resInt<-rep(NA,B)
+    # resSlp<-rep(NA,B)
     
     res<-foreach(i = 1:B) %dopar% {
       #if(i %% 100 == 0){
@@ -344,8 +344,8 @@ if(is.na(args[2]) | args[2]=="malvacc"){
       
       datSim<-simulateDataMalVacc(n=datPowMalVacc$n[j],prevBin=datPowMalVacc$malariaPrev[j],sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=datPowMalVacc$effectSize[j],effectSizeSD=0.25,pDropOut=datPowMalVacc$pDropOut[j],ageMin=9,ageMax=36,dirVE=datPowMalVacc$dirVE[j],indirVE=datPowMalVacc$indirVE[j],vaccCov=datPowMalVacc$vaccCov[j])
       tmp<-fitGEETestCoeffMalVacc(dat=datSim,coefName1="vaccine",coefName2="vaccCluster",alpha=datPowMalVacc$alpha[j])
-      #resInt[i]<-tmp[1]
-      #resSlp[i]<-tmp[2]
+      # resInt[i]<-tmp[1]
+      # resSlp[i]<-tmp[2]
       tmp
     }
     
@@ -362,11 +362,26 @@ if(is.na(args[2]) | args[2]=="malvacc"){
   
 }
 
+#dat<-read.csv("vacciNTS_Power_MalVacc.csv")
+datPowMalVacc<-read.csv("Vacc-iNTS_SampleSize_MalariaInfection_20200311_fullTable_1000.csv")
 
+g<-ggplot(data=datPowMalVacc,mapping=aes(x=effectSize,y=power,group=factor(dirVE),color=factor(dirVE))) +
+  geom_point(size=3) +
+  geom_line(lwd=1.25) +
+  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  scale_color_manual(values=c("steelblue","orange"),name="Malaria vaccine efficacy.") +
+  ylab("power") +
+  xlab("effect size of malaria infection on SBA") +
+  ggtitle("Power to detect an association between malaria vaccination and iNTS serology (10% drop-out rate).") +
+  theme(text=element_text(size=16)) + 
+  ylim(c(0,1)) +
+  theme_bw()
 
-##############################
+print(g)
+
+################################
 ## 3. Salmonella stool exposure
-##############################
+################################
 
 gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.15,0.2,0.25),c(0.2,0.3,0.4,0.5),c(1/24,0.06,0.08,0.099))
 
