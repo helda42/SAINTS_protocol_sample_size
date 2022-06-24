@@ -13,7 +13,7 @@ library(ggplot2)
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(2000, 2225, 2500, 2750, 3000),c(0.1, 0.2),c(0.4,0.6),c(0.03))
+gr<-expand.grid(c(2000, 2225, 2500, 2750, 3000),c(0.1, 0.2),c(0.4,0.6),c(0.02))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -46,14 +46,14 @@ datPowSalm
 
 pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malnutrition_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
-  geom_point(size=4) +
-  geom_line(lwd=2) +
+  geom_point(size=2) +
+  geom_line(lwd=1) +
   scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
-  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
   theme(legend.position = "right",text=element_text(size=16)) +
   xlab("number of paired samples") +
   ylab("power") +
-  ggtitle("Power curves by effect size. Prevalence of Malnutrition = 0.03, drop-out = 20%.") +
+  ggtitle("Power curves by effect size. Prevalence of Malnutrition = 0.02, drop-out = 20%") +
   theme_bw()
 dev.off()
 
@@ -62,7 +62,7 @@ dev.off()
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(1750, 2000, 2225, 2500),c(0.05, 0.1),c(0.4,0.6),c(0.16))
+gr<-expand.grid(c(2000, 2225, 2500, 2750, 3000),c(0.05, 0.1),c(0.4,0.6),c(0.16))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -95,24 +95,23 @@ datPowSalm
 
 pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_malaria_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
-  geom_point(size=4) +
-  geom_line(lwd=2) +
+  geom_point(size=2) +
+  geom_line(lwd=1) +
   scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
-  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
   theme(legend.position = "right",text=element_text(size=16)) +
   xlab("number of paired samples") +
   ylab("power") +
   theme_bw() +
-  ggtitle("Power curves by effect size. Prevalence of Malaria = 0.16, drop-out = 20%.")
+  ggtitle("Power curves by effect size. Prevalence of Malaria = 0.16, drop-out = 20%") +
+  theme_bw()
 dev.off()
 
 
-
 ## Anaemia
-
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(1750, 2000, 2225, 2500),c(0.05, 0.1),c(0.4,0.6),c(0.34))
+gr<-expand.grid(c(2000, 2225, 2500, 2750, 3000),c(0.05, 0.1),c(0.4,0.6),c(0.34))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -145,15 +144,15 @@ datPowSalm
 
 pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_ananamia_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
-  geom_point(size=4) +
-  geom_line(lwd=2) +
+  geom_point(size=2) +
+  geom_line(lwd=1) +
   scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
   geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
   theme(legend.position = "right",text=element_text(size=16)) +
   xlab("number of paired samples") +
   ylab("power") +
   theme_bw() +
-  ggtitle("Power curves by effect size. Prevalence of Anaemia = 0.34, drop-out = 20%.")
+  ggtitle("Power curves by effect size. Prevalence of Anaemia = 0.34, drop-out = 20%")
 dev.off()
 
 
@@ -161,7 +160,7 @@ dev.off()
 
 # grid of sample size, effect size (proportion seroconverted in each group), standard deviation, prevalance of exposure
 #  gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
-gr<-expand.grid(c(1750, 2000, 2225, 2500),c(0.1, 0.2),c(0.4,0.6),c(0.02))
+gr<-expand.grid(c(2000, 2225, 2500, 2750, 3000),c(0.1, 0.2),c(0.4,0.6),c(0.02))
 
 datPowSalm<-data.frame(
   alpha=0.05,
@@ -194,10 +193,10 @@ datPowSalm
 
 pdf(file="~/work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size/outputs/Vacc-iNTS_SampleSize_sicklecell_seroconvert.pdf",width=16,height=9)
 ggplot(data=datPowSalm,mapping=aes(x=nTot,y=power,group=EsSd, colour=EsSd)) +
-  geom_point(size=4) +
-  geom_line(lwd=2) +
+  geom_point(size=2) +
+  geom_line(lwd=1) +
   scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
-  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
   theme(legend.position = "right",text=element_text(size=16)) +
   xlab("number of paired samples") +
   ylab("power") +
