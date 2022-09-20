@@ -12,7 +12,7 @@ library(tidyverse)
 
 
 ########################
-## Malaria exposure
+## Effect of malaria exposure on acquisition of SBA
 #######################
 
 args<-commandArgs(T)
@@ -165,25 +165,8 @@ c2<-rgb(c2[1],c2[2],c2[3],alpha=75,maxColorValue=255)
 
 pdf(file="~/work/PhD/VacciNTS/Sample size/Vacc-iNTS_SampleSize_MalariaInfection_n1000_es0.1_pDO0.2.pdf",width=16,height=9)
 datSim<-simulateDataMalSBA(n=1000,prevBin=0.16,sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=0.1,effectSizeSD=0.25,pDropOut=0.2,ageMin=9,ageMax=36)
-#mod<-gee(sba~agem9*exposure,id=pid,data=datSim[order(datSim$pid,datSim$visit),],corstr="exchangeable",na.action=na.omit)
-#mod<-gee(sba~agem9*exposure,id=as.factor(pid),data=datSim[order(datSim$pid,datSim$visit),],corstr="exchangeable",na.action=na.omit)
 datSim$pid_n <- as.numeric(stringr::str_extract(datSim$pid, "\\d+"))
 mod<-gee(sba~agem9*exposure,id=pid_n,data=datSim,corstr="exchangeable")
-
-# datSim2 <- datSim %>%
-#   arrange(pid_n, visit) %>% 
-#   mutate(sba_n = ifelse(visit==2,sba,sba9m))
-
-# ggplot(data=datSim2[order(datSim$pid_n,datSim2$visit),],mapping=aes(x=agem9,y=sba_n,col=exposure)) +
-#   geom_point() + 
-#   geom_line(aes(group=as.numeric(pid_n))) +
-#   scale_color_manual(values=c(c1,c2)) +
-#   geom_abline(lwd=1,intercept=coef(mod)["(Intercept)"]+coef(mod)["exposureexposed"],slope=coef(mod)["agem9"]+coef(mod)["agem9:exposureexposed"],col="orange") + 
-#   geom_abline(lwd=1,intercept=coef(mod)["(Intercept)"],slope=coef(mod)["agem9"],col="steelblue") +
-#   theme_bw()
-# 
-# export(datSim, here("data", "datSim.RData"))
-# export(mod, here("data", "mod.RData"))
 
 g<-ggplot(data=datSim[order(datSim$pid_n,datSim$visit),],mapping=aes(x=agem9,y=sba,col=exposure)) +
   geom_point() + 
@@ -238,7 +221,8 @@ print(g)
 dev.off()
 
 
-  
+###############################################################################################
+# Power for detecting change in SBA following enteric salmonella exposure (8%) prevalence 
 # salmonella exposure (do this only for paired t-test etc): ~`1/24 exposed; focus only on those exposed before visit 1 `
   gr<-expand.grid(seq(2000,3000,by=100),c(0.1,0.2),c(0.4,0.6))
   
@@ -472,3 +456,5 @@ ggplot(data=datPowMalVacc,mapping=aes(x=effectSize,y=powerDir,group=factor(dirVE
   ylim(c(0,1)) +
   theme_bw()
 dev.off()
+
+
