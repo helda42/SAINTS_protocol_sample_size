@@ -1,6 +1,12 @@
 #setwd("C:/Users/UoL_1036620/OneDrive - The University of Liverpool/Documents/Work/PhD/VacciNTS/Sample size/SAINTS_protocol_sample_size")
 #source("scripts/standardSampleSizeCalcs.R")
-library(png)
+library(ggplot2)
+library(RColorBrewer)
+#library(lme4)
+#library(lmerTest)
+library(gee) # using GEE instead of LMM; fixed intercept in LMM captured some of the effect due to exposure...
+library(doParallel)
+library(pwr)
 
 ## Power and precision for range of seroprevalances
 x<-seq(0,1,by=0.01)
@@ -57,7 +63,6 @@ for(i in 1:length(x)){
 
 png(paste(sep="","outputs/moeSampSize_n",n,"_nSim",nSim,".png"),width=16,height=9,res=450,units="in")
 par(mfrow=c(1,2))
-
 plot(x,y,xlab="prevalence",ylab="estimated prevalence",col="black",type="l",lwd=2,asp=1,main="n=200")
 #tmpCol<-col2rgb("lightblue")
 #polygon(x=c(x,x[length(x):1]),y=c(yll,ylu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=230),border=NA)
@@ -78,7 +83,6 @@ polygon(x=c(x,x[length(x):1]),y=c(moel,moeu[length(x):1]),col=rgb(maxColorValue=
 lines(x,moe,col="black",lwd=2)
 legend(x="topright",lty=c(1,1),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200)),lwd=c(2,10),legend=c("margin of error","95% confidence interval"))
 dev.off()
-
 
 idx<-seq(1,length(x),by=5)
 dat<-data.frame(x=x[idx],moe_n100=round(moeAlt1[idx],digits=2),moe_n200=round(moe[idx],digits=2),moe_n400=round(moeAlt2[idx],digits=2))
@@ -118,17 +122,19 @@ for(j in 1:nrow(datPowSeroConv)){
 }
 
 ggplot(data=datPowSeroConv[datPowSeroConv$prev==0.08,],mapping=aes(x=nTot,y=power,group=p1p2,color=p1p2)) +
-  geom_point(size=4) +
-  geom_line(lwd=2) +
+  geom_point(size=2) +
+  geom_line(lwd=1) +
   scale_color_manual(values=colorRampPalette(brewer.pal(9,"Spectral"))(length(levels(datPowSeroConv$p1p2))),name="prop. seroconverted in each group") +
   geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
   geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
   theme(legend.position = "right",text=element_text(size=16)) +
   xlab("number of paired samples") +
   ylab("power") +
-  ggtitle("Power curves for different combinations of 3-month seroconversion rates. Prevalence of exposure = 8%, drop-out = 20%.")
+  ggtitle("Power curves for different combinations of 3-month seroconversion rates. Prevalence of exposure = 8%, drop-out = 20%.") +
+  theme_bw()
 
 
+###################################################################
 ## 3. Power for detecting change in SBA due to Salmonella exposure
 
 gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
@@ -167,4 +173,8 @@ ggplot(data=datPowSalm[datPowSalm$prev==0.08,],mapping=aes(x=nTot,y=power,group=
   theme(legend.position = "right",text=element_text(size=16)) +
   xlab("number of paired samples") +
   ylab("power") +
-  ggtitle("Power curves for different effect sizes. Prevalence of exposure = 8%, drop-out = 20%.")
+  ggtitle("Power curves for different effect sizes. Prevalence of exposure = 8%, drop-out = 20%.")+
+  theme_bw()
+
+
+

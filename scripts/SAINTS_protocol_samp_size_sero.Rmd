@@ -9,6 +9,8 @@ output: html_document
 library(png)
 library(tidyverse)
 library(ggplot2)
+library(pwr)
+library(RColorBrewer)
 ## Simulate dataset for serosurveys
 
 x<-seq(0,1,by=0.01)
@@ -74,20 +76,14 @@ Data simulated (100,000 simulations) based on a binomial distribution
 Acceptable margin of error and confidence interval for estimation across all seroprevalences for 1000 single samples (200 in each of 5 age bands), as a minimum sample size for each site in Malawi, Kenya, Burkina Faso and Ghana.
 
 ```{r}
-png(paste(sep="","outputs/moeSampSize_n",n,"_nSim",nSim,".png"),width=16,height=9,res=450,units="in")
 par(mfrow=c(1,2))
 
 plot(x,y,xlab="prevalence",ylab="estimated prevalence",col="black",type="l",lwd=2,asp=1,main="n=200")
-#tmpCol<-col2rgb("lightblue")
-#polygon(x=c(x,x[length(x):1]),y=c(yll,ylu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=230),border=NA)
-#tmpCol<-col2rgb("lightblue")
-#polygon(x=c(x,x[length(x):1]),y=c(yul,yuu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=230),border=NA)
+
 tmpCol<-col2rgb("steelblue")
 polygon(x=c(x,x[length(x):1]),y=c(yl,yu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200),border=NA)
 lines(x,y,col="black",lwd=2)
-#lines(lty=2,x,yu,col="steelblue",lwd=1.5)
-#lines(lty=2,x,yl,col="steelblue",lwd=1.5)
-#legend(x="bottomright",lty=c(1,2,1),lwd=c(2,1.5,10),col=c("black","steelblue",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=230)),legend=c("estimate","95% confidence interval","95% confidence interval of the lower and upper bounds of the CI"))
+
 legend(x="bottomright",lty=c(1,1),lwd=c(2,10),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200)),legend=c("estimate","95% confidence interval"))
 
 plot(x,moe,col="black",type="l",lwd=2,main="n=200",xlab="prevalence",ylab="margin of error")
@@ -96,15 +92,7 @@ tmpCol<-col2rgb("steelblue")
 polygon(x=c(x,x[length(x):1]),y=c(moel,moeu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200),border=NA)
 lines(x,moe,col="black",lwd=2)
 legend(x="topright",lty=c(1,1),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200)),lwd=c(2,10),legend=c("margin of error","95% confidence interval"))
-dev.off()
 
-
-idx<-seq(1,length(x),by=5)
-dat<-data.frame(x=x[idx],moe_n100=round(moeAlt1[idx],digits=2),moe_n200=round(moe[idx],digits=2),moe_n400=round(moeAlt2[idx],digits=2))
-print(dat)
-write.csv(dat,file=paste(sep="","outputs/moeSampSize_n",n,"_nSim",nSim,".csv"))
-
-save(list=ls(),file=paste(sep="","outputs/moeSampSize_n",n,"_nSim",nSim,".RData"))
 ```
 
 
@@ -123,22 +111,23 @@ As before, we will use ready formulas (now for comparing proportions between 2 g
 ### Results
 
 ```{r}
+
 gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.15,0.2,0.25),c(0.2,0.3,0.4,0.5),c(1/24,0.074,0.08,0.099))
 
 datPowSeroConv<-data.frame(
-	alpha=0.05,
-	prev=gr[,4],
-	pDropOut=0.2,
-	nTot=gr[,1],
-	nTotComp=NA,
-	n1=NA,
-	n2=NA,
-	p1=gr[,2],
-	p2=gr[,3],
-	power=NA
+  alpha=0.05,
+  prev=gr[,4],
+  pDropOut=0.2,
+  nTot=gr[,1],
+  nTotComp=NA,
+  n1=NA,
+  n2=NA,
+  p1=gr[,2],
+  p2=gr[,3],
+  power=NA
 )
 
-datPowSeroConv$nTotComp<-floor((1-datPowSalm$pDropOut)*datPowSalm$nTot)
+datPowSeroConv$nTotComp<-floor((1-datPowSeroConv$pDropOut)*datPowSeroConv$nTot)
 datPowSeroConv<-datPowSeroConv[datPowSeroConv$p2/datPowSeroConv$p1<3 & datPowSeroConv$p2/datPowSeroConv$p1>1,]
 
 datPowSeroConv$n1<-round(datPowSeroConv$prev*datPowSeroConv$nTotComp)
@@ -146,8 +135,9 @@ datPowSeroConv$n2<-round((1-datPowSeroConv$prev)*datPowSeroConv$nTotComp)
 datPowSeroConv$p1p2<-factor(paste(sep="","p1 = ",datPowSeroConv$p1,", p2 = ",datPowSeroConv$p2))
 
 for(j in 1:nrow(datPowSeroConv)){
-	datPowSeroConv$power[j]<-pwr.2p2n.test(h=ES.h(p1=datPowSeroConv$p1[j],p2=datPowSeroConv$p2[j]),n1=datPowSeroConv$n1[j],n2=datPowSeroConv$n2[j])$power
+  datPowSeroConv$power[j]<-pwr.2p2n.test(h=ES.h(p1=datPowSeroConv$p1[j],p2=datPowSeroConv$p2[j]),n1=datPowSeroConv$n1[j],n2=datPowSeroConv$n2[j])$power
 }
+
 ```
 
 Results below show that power is quite high for most scenarios, particularly when the effect of exposure results in a doubling or more of the seroconversion rate (i.e. p2 $\geq$ 2$\cdot$p1).
@@ -156,15 +146,16 @@ Note that the sample sizes go up to 2,500 on the graph below. The vertical dashe
 
 ```{r}
 ggplot(data=datPowSeroConv[datPowSeroConv$prev==0.08,],mapping=aes(x=nTot,y=power,group=p1p2,color=p1p2)) +
-	geom_point(size=4) +
-	geom_line(lwd=2) +
-	scale_color_manual(values=colorRampPalette(brewer.pal(9,"Spectral"))(length(levels(datPowSeroConv$p1p2))),name="prop. seroconverted in each group") +
-	geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
-	geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
-	theme(legend.position = "right",text=element_text(size=16)) +
-	xlab("number of paired samples") +
-	ylab("power") +
-	ggtitle("Power curves for different combinations of 3-month seroconversion rates. Prevalence of exposure = 8%, drop-out = 20%.")
+  geom_point(size=2) +
+  geom_line(lwd=1) +
+  scale_color_manual(values=colorRampPalette(brewer.pal(9,"Spectral"))(length(levels(datPowSeroConv$p1p2))),name="prop. seroconverted in each group") +
+  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
+  theme(legend.position = "right",text=element_text(size=16)) +
+  xlab("number of paired samples") +
+  ylab("power") +
+  ggtitle("Power curves for different combinations of 3-month seroconversion rates. Prevalence of exposure = 8%, drop-out = 20%.") +
+  theme_bw()
 ```
 
 ## 3. Power for detecting change in SBA due to Salmonella exposure
@@ -189,17 +180,17 @@ In R we calculate this using the function `pwr.t2n.test()` from the `pwr` packag
 gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.2),c(0.4,0.6),c(1/24,0.074,0.08,0.099))
 
 datPowSalm<-data.frame(
-	alpha=0.05,
-	prev=gr[,4],
-	pDropOut=0.2,
-	nTot=gr[,1],
-	nTotComp=NA,
-	n1=NA,
-	n2=NA,
-	delta=gr[,2],
-	sd=gr[,3],
-	es=NA,
-	power=NA
+  alpha=0.05,
+  prev=gr[,4],
+  pDropOut=0.2,
+  nTot=gr[,1],
+  nTotComp=NA,
+  n1=NA,
+  n2=NA,
+  delta=gr[,2],
+  sd=gr[,3],
+  es=NA,
+  power=NA
 )
 
 datPowSalm$nTotComp<-floor((1-datPowSalm$pDropOut)*datPowSalm$nTot)
@@ -208,10 +199,11 @@ datPowSalm$n2<-round((1-datPowSalm$prev)*datPowSalm$nTotComp)
 datPowSalm$es<-round(digits=2,datPowSalm$delta/datPowSalm$sd)
 
 for(j in 1:nrow(datPowSalm)){
-	datPowSalm$power[j]<-pwr.t2n.test(n1=datPowSalm$n1[j],n2=datPowSalm$n2[j],d=datPowSalm$es[j],sig.level=datPowSalm$alpha[j])$power
+  datPowSalm$power[j]<-pwr.t2n.test(n1=datPowSalm$n1[j],n2=datPowSalm$n2[j],d=datPowSalm$es[j],sig.level=datPowSalm$alpha[j])$power
 }
 
 datPowSalm$EsSd<-factor(paste(sep="","ES = ",datPowSalm$delta,", SD = ",datPowSalm$sd))
+
 ```
 
 As the results below show, power is quite high (`r round(digits=2,100*datPowSalm$power[datPowSalm$prev==0.08 & datPowSalm$delta==0.2 & datPowSalm$nTot==2000 & datPowSalm$sd==0.4])`%) for a difference of 0.2 in SBA between the 2 groups, assuming 2,000 individuals, 20% drop-out, $\sigma_{SBA}=0.4$. If SBA has higher variance (e.g. $\sigma=0.6$ rather than $\sigma=0.4$), power will be reduced but still very high (`r round(digits=2,100*datPowSalm$power[datPowSalm$prev==0.08 & datPowSalm$delta==0.2 & datPowSalm$nTot==2000 & datPowSalm$sd==0.6])`% for $\sigma_{SBA}=0.6$).
@@ -222,15 +214,17 @@ Note that the sample sizes go up to 2,500 on the graph below. The vertical dashe
 
 ```{r}
 ggplot(data=datPowSalm[datPowSalm$prev==0.08,],mapping=aes(x=nTot,y=power,group=EsSd,color=EsSd)) +
-	geom_point(size=4) +
-	geom_line(lwd=2) +
-	scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
-	geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
-	geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
-	theme(legend.position = "right",text=element_text(size=16)) +
-	xlab("number of paired samples") +
-	ylab("power") +
-	ggtitle("Power curves for different effect sizes. Prevalence of exposure = 8%, drop-out = 20%.")
+  geom_point(size=2) +
+  geom_line(lwd=1) +
+  scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
+  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
+  theme(legend.position = "right",text=element_text(size=16)) +
+  xlab("number of paired samples") +
+  ylab("power") +
+  ggtitle("Power curves for different effect sizes. Prevalence of exposure = 8%, drop-out = 20%.")+
+  theme_bw()
+
 ```
 
 
