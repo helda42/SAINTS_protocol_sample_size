@@ -2,10 +2,14 @@
 title: "SAINTS - Sample size / power calculation - seroprevalance and seroincidence"
 author: "Helen Dale"
 date: "2022-09-05"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, rsuslts='hide', fig.width=16, fig.height=9)
+
 library(png)
 library(tidyverse)
 library(ggplot2)
