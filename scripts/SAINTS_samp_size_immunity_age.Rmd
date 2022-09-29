@@ -1,0 +1,660 @@
+---
+title: "SAINTS - Sample size / power calculation - immunity with age"
+author: "Helen Dale"
+date: "11/07/2022"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, results ='hide', fig.width=16, fig.height=9)
+
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+library(gee) # using GEE instead of LMM; fixed intercept in LMM captured some of the effect due to exposure...
+library(doParallel)
+library(pwr)
+library(rio)
+library(here)
+
+
+args<-commandArgs(T)
+
+if(!is.na(args[1])){
+  cat(paste(sep="","Using ",args[1]," cores!\n\n"))
+  registerDoParallel(cores=args[1])
+}else{
+  cat(paste(sep="","Using ",2," cores!\n\n"))
+  registerDoParallel(cores=2)
+}
+
+set.seed(20200128)
+
+# power parameters
+alpha<-0.05
+power<-0.8
+B<-1e3 # number of simulations
+
+
+if(is.na(args[2]) | args[2]=="malaria"){
+  # simulate data
+  simulateDataMalSBA<-function(n,prevBin=0.16,sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=0.5,effectSizeSD=0.25,pDropOut=0.2,ageMin=9,ageMax=36){
+    # n<-100 # this would yield 2n measurements, each pair of measurements for the n individuals 3 months apart
+    # prevBin<-0.26 # malaria prevalence in children 6-60 months, Southern Malawi, MIS 2017 p.43 Fig 4.4, https://dhsprogram.com/pubs/pdf/MIS28/MIS28.pdf
+    # sbaSD<-0.4 # Nyirenda et al (2014)
+    # sbaSlopeMonth<-(-0.105) # Nyirenda et al (2014)
+    # ageMin<-9; ageMax<-36 # Nyirenda et al (2014)
+    
+    pid<-paste(sep="","p",1:n)
+    ages<-runif(n=n,min=ageMin,max=ageMax) 
+    binCov<-rbinom(n=2*n,size=1,prob=prevBin) # allows participants to change state for each visit; assumed independent risk at each visit and risk the same at all ages -- both of which may not be entirely realistic...
+    
+    u<-rnorm(n=n,mean=0,sd=iccSD)
+    v<-rnorm(n=n,mean=0,sd=iccSD)
+    sba9m<-rnorm(n=n,mean=0,sd=sbaSD)
+    
+    datSim<-data.frame(pid=rep(pid,2),
+                       visit=c(rep(1,n),rep(2,n)),
+                       age=c(ages,ages+rnorm(n,mean=3,sd=0.05)), # approximately 3 months between initial recruitment and follow-up but allowing minor deviations from planned visit dates
+                       ageSlopeEffectLimit=NA,
+                       exposure=ifelse(binCov==1,"exposed","unexposed"),
+                       u=rep(u,2),
+                       v=rep(v,2),
+                       sba9m=rep(sba9m,2),
+                       sba=NA)
+    
+    datSim$exposure<-factor(datSim$exposure,levels=c("unexposed","exposed"))
+    datSim$agem9<-datSim$age-9
+    
+   for(i in 1:nrow(datSim)){
+      pid<-datSim$pid[i]
+      idx1<-which(datSim$pid==pid & datSim$visit==1)
+      idx2<-which(datSim$pid==pid & datSim$visit==2)
+      datSim$ageSlopeEffectLimit[i]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx1]-0.5,datSim$age[i])
+    }
+    
+ 
+    datSim$sba<-datSim$sba9m+datSim$u+(sbaSlopeMonth+datSim$v)*(datSim$ageSlopeEffectLimit-9)+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$exposure=="exposed",1,0)
+    datSim$sba[datSim$visit==2 & rbinom(n=n,size=1,prob=pDropOut)==1]<-NA
+    
+    return(datSim)
+  }
+  
+  # detect a change in slope of SBA with age for i) malaria cases, ii) malaria vaccinated, iii) other binary covariates (linear mixed model approach)
+  fitGEETestCoeff<-function(dat,alpha=0.05,coefName1="exposureexposed",coefName2=NULL){
+    library(gee)
+    mod<-gee(sba~agem9*exposure,id=as.factor(pid),data=dat[order(dat$pid,dat$visit),],corstr="exchangeable",na.action=na.omit)
+    p1<-2*(1-pnorm(abs(summary(mod)$coefficients[coefName1,"Robust z"])))
+    p2<-2*(1-pnorm(abs(summary(mod)$coefficients[coefName2,"Robust z"])))
+    
+    if(p1<alpha){
+      res<-1
+    }else{
+      res<-0
+    }
+    
+    if(!is.null(coefName2)){
+      
+      if(p2<alpha){
+        res<-c(res,1)
+      }else{
+        res<-c(res,0)
+      }
+    }
+    
+    return(res)
+  }
+  
+  
+  # malaria infection; prevalence ~16%; try sample sizes 1000, 1500, 2000 and effect sizes 0.05, 0.1, 0.15
+  gr<-expand.grid(c(2000, 2500, 3000),c(0.2, 0.225, 0.25, 0.275, 0.3),c(0.2))
+  datPow<-data.frame(
+    alpha=0.05,
+    malariaPrev=0.16,
+    effectSize=gr[,2],
+    n=gr[,1],
+    pDropOut=gr[,3],
+    powerShift=NA,
+    powerSlope=NA
+  )
+  
+  for(j in 1:nrow(datPow)){
+    cat(paste(sep="","## effectSize = ",datPow$effectSize[j],", n = ",datPow$n[j],", pDropOut = ",datPow$pDropOut[j]," ##\n"))
+    
+    
+    res<-foreach(i = 1:B) %dopar% {
+     
+      datSim<-simulateDataMalSBA(n=datPow$n[j],prevBin=datPow$malariaPrev[j],sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=datPow$effectSize[j],effectSizeSD=0.25,pDropOut=datPow$pDropOut[j],ageMin=9,ageMax=36)
+      tmp<-fitGEETestCoeff(dat=datSim,coefName1="exposureexposed",coefName2="agem9:exposureexposed",alpha=datPow$alpha[j])
+      
+      tmp
+    }
+    
+    tmp<-matrix(unlist(res),byrow=T,ncol=2)
+    resInt<-tmp[,1]
+    resSlp<-tmp[,2]
+    
+    datPow$powerShift[j]<-sum(resInt)/B
+    datPow$powerSlope[j]<-sum(resSlp)/B
+    cat(paste(sep="","power to detect a shift in SBA = ",datPow$powerShift[j],", power to detect a change in SBA-age slope = ",datPow$powerSlope[j]," [",datPow$effectSize[j],", ",datPow$n[j],", ",datPow$pDropOut[j],"]\n\n"))
+  }
+}
+
+datPowMalInf <- datPow
+export(datPowMalInf, here("data", "datPowMalInf.RData"))
+
+```
+
+
+
+## 1. Power for detecting change in SBA due to malaria infection
+
+## Common assumptions
+
+* Significance level $\alpha=0.05$.
+
+* Minimum power 80%.
+
+* SBA (log10 change in STm cfu/ml) standard deviation $\sigma_{SBA}=0.4-0.6$; based on [Nyirenda et al (2014), Fig. 4C](https://doi.org/10.1093/infdis/jiu045)
+
+* SBA average slope with age (in months) for Malawian children aged 9-36 months $\beta=\approx-0.1$; based on [Nyirenda et al (2014), text p.61 & Fig. 4C](https://doi.org/10.1093/infdis/jiu045)
+
+* $n$ recruited participants, each followed up approximately 3 months later, yielding $n$ pairs of samples from the same individuals.
+
+* $p_{DropOut}=20\%$
+
+
+This calculation estimates statistical power to detect an average shift (up or down) of $\delta_p$ in SBA as a result of a malaria episode. We also looked at power to detect a change in the slope of SBA with age.
+
+### Assumptions
+
+* Malaria prevalence in Southern Malawi: $p_{mal}=26\%$ (children 6-60 monhts; [MIS 2017](https://dhsprogram.com/pubs/pdf/MIS28/MIS28.pdf), p.43 Fig 4.4)
+
+### Method
+
+There are no ready-to-use sample size formulas for this situation and hence we used simulations to estimate statistical power.
+
+Data were simulated as follows:
+
+For $i=1,\ldots,N$, $j=1,2$:
+
+* $u_i\sim\mathcal{N}(0,0.03)$; random subject specific intercept
+
+* $v_i\sim\mathcal{N}(0,0.03)$; random subject specific slope
+
+* $SBA_{9m,i}\sim\mathcal{N}(0,\sigma_{SBA})$
+
+* $malaria_{i,j}\sim\mbox{Bernoulli}(p_{mal})$
+
+* $age_{i,1}\sim\mbox{Uniform}(9,36)$, $age_{i,2}\sim\mathcal{N}(age_{i,1}+3,0.05)$
+
+* $age^*_{i,j}=age_{i,j}$ if $malaria_{i,1}=0$, $age^*_{i,j}=age_{i,1}-0.5$ if $malaria_{i,1}=1$ 
+
+* $\delta_{i,j}\sim\mathcal{N}(\delta_p,0.25)$
+
+Finally:
+
+$$SBA_{i,j}=SBA_{9m,i}+u_i+(\beta+v_i)(age^*_{i,j}-9)+\delta_{i,j}\cdot malaria_{i,j}$$
+
+The simulated data are then analysed using a Generalised Estimating Equations (GEE) model that accounts for the correlations between observations for the same individual:
+
+$$SBA_{i,j}=\beta_0+\beta_1\cdot(age_{i,j}-1)+\beta_2 \cdot malaria_{i,j}+\beta_3 \cdot malaria_{i,j}\cdot (age_{i,j}-9)+\epsilon_{i,j}$$
+with an exchangeable correlation structure, i.e. for all $i$, $(\epsilon_{i,1},\epsilon_{i,2})\sim\mathcal{N}(\mathbf{0},\Sigma)$, $\Sigma=\left({\begin{array}{cc}\sigma^2 & \rho \\ \rho & \sigma^2 \\ \end{array} }\right)$.
+
+For power calculation, we simulated a large number, $B=2,000$, datasets, analysed each as above, then tested $H_0: \beta_2=0$, vs. $H_1: \beta_2\neq 0$. Empirical power was then determined as $power=\frac{\mbox{# times }H_0\mbox{ is rejected}}{B}$. We also did the same for testing $\beta_3$.
+
+Below is an example of the simulated data.
+
+```{r}
+# produce a few example figures of data generated
+c1<-col2rgb("steelblue")
+c1<-rgb(c1[1],c1[2],c1[3],alpha=75,maxColorValue=255)
+c2<-col2rgb("orange")
+c2<-rgb(c2[1],c2[2],c2[3],alpha=75,maxColorValue=255)
+
+datSim<-simulateDataMalSBA(n=1000,prevBin=0.16,sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=0.1,effectSizeSD=0.25,pDropOut=0.2,ageMin=9,ageMax=36)
+mod<-gee(sba~agem9*exposure,id=as.factor(pid),data=datSim[order(datSim$pid,datSim$visit),],corstr="exchangeable",na.action=na.omit)
+
+ggplot(data=datSim,aes(x=agem9,y=sba,col=exposure,group=pid)) +
+  geom_point() + 
+  geom_line() +
+  scale_color_manual(values=c(c1,c2)) +
+  geom_abline(lwd=2,intercept=coef(mod)["(Intercept)"]+coef(mod)["exposureexposed"],slope=coef(mod)["agem9"]+coef(mod)["agem9:exposureexposed"],col="orange") + 
+  geom_abline(lwd=2,intercept=coef(mod)["(Intercept)"],slope=coef(mod)["agem9"],col="steelblue") +
+  theme(legend.position = "right",
+        text=element_text(size=16)) +
+  theme_bw() +
+  xlab("age in months") +
+  ylab("SBA titre") +
+  ggtitle("Example results for one simulation: SBA responses with age by malaria exposure")
+
+```
+
+### Results
+
+As the graph below shows, with 2,500 paired samples (blue line), the study would be quite well powered to detect in shifts in SBA of 0.25 or more.
+
+While 0.25 may seem quite a subtle effect, it is worth considering that that is less than the effect of aging by 3 months. 
+
+```{r}
+# produce power curves
+ggplot(data=datPow[datPow$pDropOut==0.2,],mapping=aes(x=effectSize,y=powerShift,group=as.factor(n),color=as.factor(n))) +
+  geom_point(size=3) +
+  geom_line(lwd=1.5) +
+  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
+  scale_color_manual(values=c("steelblue","orange","red"),name="Number of paired samples") +
+  ylab("power") +
+  xlab("effect size (shift in average SBA)") +
+  ggtitle("Power for different effect sizes and sample sizes, assuming 20% drop-out.") +
+  theme(text=element_text(size=16)) +
+  theme_bw()
+```
+
+The change in slope implied by the way the data was generated (basically if you have malaria at the time of the first measurement, you stop having the benefit of improving SBA via aging) is quite small and power to detect this is very low (the maximum reported power across any scenario was `r 100*max(datPow$powerSlope)`%).
+
+
+## 2. Power for detecting change in SBA due to malaria vaccination
+
+```{r, include=FALSE}
+## Dataset simulation
+
+if(is.na(args[2]) | args[2]=="malvacc"){
+  
+  simulateDataMalVacc<-function(n,prevBin=0.16,dirVE=0.4,indirVE=0.1,vaccCov=0.6,sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=0.5,effectSizeSD=0.25,pDropOut=0.2,ageMin=9,ageMax=36){
+    # n<-100 # this would yield 2n measurements, each pair of measurements for the n individuals 3 months apart
+    # prevBin<-0.26 # malaria prevalence in children 6-60 months, Southern Malawi, MIS 2017 p.43 Fig 4.4, https://dhsprogram.com/pubs/pdf/MIS28/MIS28.pdf
+    # sbaSD<-0.4 # Nyirenda et al (2014)
+    # sbaSlopeMonth<-(-0.105) # Nyirenda et al (2014)
+    # ageMin<-9; ageMax<-36 # Nyirenda et al (2014)
+    
+    pid<-paste(sep="","p",1:n)
+    ages<-runif(n=n,min=ageMin,max=ageMax) 
+    binCov<-rbinom(n=2*n,size=1,prob=prevBin) # allows participants to change state for each visit; assumed independent risk at each visit and risk the same at all ages -- both of which may not be entirely realistic...
+    
+    u<-rnorm(n=n,mean=0,sd=iccSD)
+    v<-rnorm(n=n,mean=0,sd=iccSD)
+    sba9m<-rnorm(n=n,mean=0,sd=sbaSD)
+    
+    cluster<-c(rep(c(rep(0,n/2),rep(1,n/2)),2)) # vaccine cluster membership
+    vaccTmp<-sample(0:1,size=n/2,replace=T,prob=c(1-vaccCov,vaccCov))
+    vaccine<-c(rep(0,n/2),vaccTmp,rep(0,n/2),vaccTmp) # vaccination recipients
+    
+    protCov<-rep(0,2*n)
+    idxIndi<-which(binCov==1 & cluster==1 & vaccine==0)
+    idxVacc<-which(binCov==1 & vaccine==1)
+    protCov[sample(idxIndi,replace=T,size=round(indirVE*length(idxIndi)))]<-1
+    protCov[sample(idxVacc,replace=T,size=round((1-(1-indirVE)*(1-dirVE))*length(idxVacc)))]<-1
+    
+    datSim<-data.frame(pid=rep(pid,2),
+                       visit=c(rep(1,n),rep(2,n)),
+                       age=c(ages,ages+rnorm(n,mean=3,sd=0.05)), # approximately 3 months between initial recruitment and follow-up but allowing minor deviations from planned visit dates
+                       vaccCluster=cluster,
+                       vaccine=vaccine,
+                       ageSlopeEffectLimit=NA,
+                       exposure=ifelse(binCov==1,"exposed","unexposed"),
+                       infection=ifelse(binCov==1 & protCov==0,"infected","uninfected"),
+                       u=rep(u,2),
+                       v=rep(v,2),
+                       sba9m=rep(sba9m,2),
+                       sba=NA)
+    
+    datSim$exposure<-factor(datSim$exposure,levels=c("unexposed","exposed"))
+    datSim$infection<-factor(datSim$infection,levels=c("uninfected","infected"))
+    datSim$agem9<-datSim$age-9
+    
+    for(i in 1:nrow(datSim)){
+      pid<-datSim$pid[i]
+      idx1<-which(datSim$pid==pid & datSim$visit==1)
+      idx2<-which(datSim$pid==pid & datSim$visit==2)
+      datSim$ageSlopeEffectLimit[i]<-ifelse(datSim$infection[idx1]=="infected",datSim$age[idx1]-0.5,datSim$age[i])
+    }
+    
+    #datSim$sba<-datSim$sba9m+datSim$u+(sbaSlopeMonth+datSim$v)*(datSim$age-9-ifelse(datSim$visit==1 & datSim$exposure=="exposed",1,ifelse(datSim$visit==2 & datSim$exposure=="exposed",0.5,0)))+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$exposure=="exposed",1,0)
+    datSim$sba<-datSim$sba9m+datSim$u+(sbaSlopeMonth+datSim$v)*(datSim$ageSlopeEffectLimit-9)+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$infection=="infected",1,0)
+    #datSim$sba<-datSim$sba9m+datSim$u+(sbaSlopeMonth+datSim$v)*(datSim$age-9)+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$exposure=="exposed",1,0)
+    datSim$sba[datSim$visit==2 & rbinom(n=n,size=1,prob=pDropOut)==1]<-NA
+    
+    return(datSim)
+  }
+  
+  fitGEETestCoeffMalVacc<-function(dat,alpha=0.05,coefName1="vaccine",coefName2=NULL){
+    library(gee)
+    #mod<-lmer(sba~agem9*exposure+(1|pid),REML=F,data=dat) # REML=F as we test fixed parameters; cannot have a second random effect even though this is how data was generated; would need more data points per participant...
+    mod<-gee(sba~agem9*exposure+vaccCluster+vaccine,id=as.factor(pid),data=dat[order(dat$pid,dat$visit),],corstr="exchangeable",na.action=na.omit)
+    p1<-2*(1-pnorm(abs(summary(mod)$coefficients[coefName1,"Robust z"])))
+    p2<-2*(1-pnorm(abs(summary(mod)$coefficients[coefName2,"Robust z"])))
+    
+    #if(summary(mod)$coefficients[coefName1,"Pr(>|t|)"]<alpha){
+    if(p1<alpha){
+      res<-1
+    }else{
+      res<-0
+    }
+    
+    if(!is.null(coefName2)){
+      #if(summary(mod)$coefficients[coefName2,"Pr(>|t|)"]<alpha){
+      if(p2<alpha){
+        res<-c(res,1)
+      }else{
+        res<-c(res,0)
+      }
+    }
+    
+    return(res)
+  }
+  
+  gr<-expand.grid(c(2500),c(0.42,0.5),c(0.1),c(0.5,0.75,1, 1.25, 1.5))
+  datPowMalVacc<-data.frame(
+    alpha=0.05,
+    malariaPrev=0.26,
+    effectSize=gr[,4],
+    dirVE=gr[,2],
+    indirVE=0.1,
+    vaccCov=0.6,
+    n=gr[,1],
+    pDropOut=gr[,3],
+    powerDir=NA,
+    powerIndir=NA
+  )
+  
+  for(j in 1:nrow(datPowMalVacc)){
+    cat(paste(sep="","## direct VE = ",datPowMalVacc$dirVE[j],", n = ",datPowMalVacc$n[j],", pDropOut = ",datPowMalVacc$pDropOut[j],", effectSize = ",datPowMalVacc$effectSize[j]," ##\n"))
+    
+    #resInt<-rep(NA,B)
+    #resSlp<-rep(NA,B)
+    
+    res<-foreach(i = 1:B) %dopar% {
+      #if(i %% 100 == 0){
+      #	cat(paste(sep="","..",i,"\n"))
+      #}
+      
+      datSim<-simulateDataMalVacc(n=datPowMalVacc$n[j],prevBin=datPowMalVacc$malariaPrev[j],sbaSD=0.4,sbaSlopeMonth=(-0.1),iccSD=0.03,effectSize=datPowMalVacc$effectSize[j],effectSizeSD=0.25,pDropOut=datPowMalVacc$pDropOut[j],ageMin=9,ageMax=36,dirVE=datPowMalVacc$dirVE[j],indirVE=datPowMalVacc$indirVE[j],vaccCov=datPowMalVacc$vaccCov[j])
+      tmp<-fitGEETestCoeffMalVacc(dat=datSim,coefName1="vaccine",coefName2="vaccCluster",alpha=datPowMalVacc$alpha[j])
+      #resInt[i]<-tmp[1]
+      #resSlp[i]<-tmp[2]
+      tmp
+    }
+    
+    tmp<-matrix(unlist(res),byrow=T,ncol=2)
+    resInt<-tmp[,1]
+    resSlp<-tmp[,2]
+    
+    datPowMalVacc$powerDir[j]<-sum(resInt)/B
+    datPowMalVacc$powerIndir[j]<-sum(resSlp)/B
+    cat(paste(sep="","power to detect vaccine direct effect = ",datPowMalVacc$powerDir[j],", power to detect vaccine indirect effect = ",datPowMalVacc$powerIndir[j]," [",datPowMalVacc$effectSize[j],", ",datPowMalVacc$dirVE[j],", ",datPowMalVacc$n[j],", ",datPowMalVacc$pDropOut[j],"]\n\n"))
+  }
+  
+  save(list=ls(),file="Vacc-iNTS_SampleSize_MalariaInfection.RData")
+  
+}
+
+export(datPowMalVacc, here("data", "datPowMalVacc.RData"))
+
+```
+
+Considering the following diagram about direct, indirect, overall and total vaccine effects:
+
+![Taken from Shim E., Galvani, A.P (2012), Distinguishing vaccine efficacy and effectiveness, Vaccine, 30, 6700-6705, DOI 10.1016/j.vaccine.2012.08.045](vaccineEffects.png)
+
+### Assumptions
+
+* Malaria prevalence in Southern Malawi: $p_{mal}=26\%$ (children 6-60 monhts; [MIS 2017](https://dhsprogram.com/pubs/pdf/MIS28/MIS28.pdf), p.43 Fig 4.4)
+
+* Vaccination coverage in the vaccine cluster is 60% (I recall that's the number Donnie mentioned on the call; need to confirm).
+
+* Malaria RTS,S/AS01 VE in children 5-17 months, 18 months after vaccination = 42-50% ([10.1371/journal.pmed.1001685](https://doi.org/10.1371/journal.pmed.1001685)). This is the direct VE. 
+
+* $VE = 1-\lambda_v/\lambda_c$ where $\lambda_v,\lambda_c$ are the incidences in vaccinated and control populations. We work with a prevalence here. However: if we assume that malaria infection has a relatively short duration, that the vaccine does not shorten or lengthen the duration of the infection episode, then a drop in incidence of X% must also result in a drop in prevalence of X%. We therefore assume the direct effect of the vaccine results in a 42-50% reduction in malaria prevalence.
+
+* Indirect effect: Assumption this is 10% (NO DATA TO SUPPORT THIS)
+
+* Balanced sampling from the vaccinated and unvaccinated clusters.
+
+* Shift in SBA due to malaria infection = 0.1 - 0.2.
+
+With these assumption we will assume 16.0% malaria prevalence in the non vaccinated cluster, 23.4% malaria prevalence in the non-vaccinated individuals from the vaccinated cluster, 11.7-13.6% malaria prevalence in the vaccinated individuals.
+
+### Method
+
+The simulation model will be largely the same as the one used for calculating power for detecting a shift in SBA due to malaria infection - with the modification that we now also simulate vaccination cluster membership, vaccination status and hence that we have 3 groups with different malaria prevalences.
+
+The analysis model will change to:
+
+$$SBA_{i,j}=\beta_0+\beta_1\cdot(age_{i,j}-1)+\beta_2 \cdot malaria_{i,j}+\beta_3 \cdot malaria_{i,j}\cdot (age_{i,j}-9)+\beta_4\cdot vaccine\_cluster + \beta_5\cdot vaccine + \epsilon_{i,j}$$
+
+The main focus of the analysis would be to test $H_0:\beta_5=0$ vs $H_1:\beta_5\neq 0$; the direct effect of malaria vaccine on SBA. A secondary focus would be to test $\beta_4$, the indirect effect on SBA.
+
+
+### Results
+
+Power is reduced. However we still reach just about 80% power for large effects of malaria infection on SBA (1 unit change) and assuming 50% vaccine efficacy of RTS,S/AS01. While this is an exploratory aim, we have still adequate power for the upper end of realistic scenarios.
+
+```{r}
+# produce power curves
+ggplot(data=datPowMalVacc,mapping=aes(x=effectSize,y=powerDir,group=factor(dirVE),color=factor(dirVE))) +
+  geom_point(size=3) +
+  geom_line(lwd=1) +
+  geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
+  scale_color_manual(values=c("steelblue","orange","red"),name="Malaria vaccine efficacy.") +
+  ylab("power") +
+  xlab("effect size of malaria infection on SBA") +
+  ggtitle("Power curves: malaria vaccination and NTS SBA (10% drop-out rate)") +
+  theme(legend.position = "right",
+        text=element_text(size=16)) +
+  ylim(c(0,1)) +
+  theme_bw()
+
+```
+
+### 3. Detecting changes in Antibody titre by malaria status
+
+Using the same approach as was taken for the SBA change by malaria infection
+
+## Common assumptions
+
+* Significance level $\alpha=0.05$.
+
+* Minimum power 80%.
+
+* Antibody titer standard deviation $\sigma_{SBA}=30$; based on [Nyirenda et al (2014), Fig. 4C](https://doi.org/10.1093/infdis/jiu045)
+
+* Antibody titer average slope with age (in months) for Malawian children aged 9-36 months $\beta=\approx30$; based on [Nyirenda et al (2014), text p.61 & Fig. 4C](https://doi.org/10.1093/infdis/jiu045)
+
+* $n$ recruited participants, each followed up approximately 3 months later, yielding $n$ pairs of samples from the same individuals.
+
+* $p_{DropOut}=20\%$
+
+
+This calculation estimates statistical power to detect an average shift (up or down) of $\delta_p$ in antibody titer as a result of a malaria episode. We also looked at power to detect a change in the slope of SBA with age.
+
+## Method
+
+Using the same approach
+
+```{r, include=FALSE}
+## Malaria infection
+
+args<-commandArgs(T)
+
+if(!is.na(args[1])){
+  cat(paste(sep="","Using ",args[1]," cores!\n\n"))
+  registerDoParallel(cores=args[1])
+}else{
+  cat(paste(sep="","Using ",2," cores!\n\n"))
+  registerDoParallel(cores=2)
+}
+
+set.seed(20200128)
+
+# power parameters
+alpha<-0.05
+power<-0.8
+B<-1e3 # number of simulations
+
+## Malaria infection
+
+if(is.na(args[2]) | args[2]=="malaria"){
+  # simulate data
+  simulateDataMalAb<-function(n,prevBin=0.16,abSD=30,abSlopeMonth=2.5,iccSD=0.03,effectSize=-12.5,effectSizeSD=30,pDropOut=0.2,ageMin=8,ageMax=36){
+    # n<-100 # this would yield 2n measurements, each pair of measurements for the n individuals 3 months apart
+    # prevBin<-0.2 # malaria prevalence in children 6-60 months, Southern Malawi, MIS 2017 p.43 Fig 4.4, https://dhsprogram.com/pubs/pdf/MIS28/MIS28.pdf
+    # abSD<- 39.8 # Nyirenda et al (2014)
+    # abSlopeMonth<-(3.2) # Nyirenda et al (2014)
+    # ageMin<-8; ageMax<-28 # Nyirenda et al (2014)
+    
+    pid<-paste(sep="","p",1:n)
+    ages<-runif(n=n,min=ageMin,max=ageMax) 
+    binCov<-rbinom(n=2*n,size=1,prob=prevBin) # allows participants to change state for each visit; assumed independent risk at each visit and risk the same at all ages -- both of which may not be entirely realistic...
+    
+    u<-rnorm(n=n,mean=0,sd=iccSD)
+    v<-rnorm(n=n,mean=0,sd=iccSD)
+    ab8m<-rnorm(n=n,mean=0,sd=abSD)
+    
+    datSim<-data.frame(pid=rep(pid,2),
+                       visit=c(rep(1,n),rep(2,n)),
+                       age=c(ages,ages+rnorm(n,mean=3,sd=0.05)), # approximately 3 months between initial recruitment and follow-up but allowing minor deviations from planned visit dates
+                       ageSlopeEffectLimit=NA,
+                       exposure=ifelse(binCov==1,"exposed","unexposed"),
+                       u=rep(u,2),
+                       v=rep(v,2),
+                       ab8m=rep(ab8m,2),
+                       ab=NA)
+    
+    datSim$exposure<-factor(datSim$exposure,levels=c("unexposed","exposed"))
+    datSim$agem8<-datSim$age-8
+    
+    for(i in 1:nrow(datSim)){
+      pid<-datSim$pid[i]
+      idx1<-which(datSim$pid==pid & datSim$visit==1)
+      idx2<-which(datSim$pid==pid & datSim$visit==2)
+      datSim$ageSlopeEffectLimit[i]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx1]-0.5,datSim$age[i])
+
+    }
+    
+    
+    datSim$ab<-datSim$ab8m+datSim$u+(abSlopeMonth+datSim$v)*(datSim$ageSlopeEffectLimit-8)+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$exposure=="exposed",1,0)
+    datSim$ab[datSim$visit==2 & rbinom(n=n,size=1,prob=pDropOut)==1]<-NA
+    datSim$ab[datSim$ab<=0]<-0.0001
+    
+    return(datSim)
+  }
+  
+  # detect a change in slope of ab with age for i) malaria cases, ii) malaria vaccinated, iii) other binary covariates (linear mixed model approach)
+  fitGEETestCoeff<-function(dat,alpha=0.05,coefName1="exposureexposed",coefName2=NULL){
+    library(gee)
+    mod<-gee(ab~agem8*exposure,id=as.factor(pid),data=dat[order(dat$pid,dat$visit),],corstr="exchangeable",na.action=na.omit)
+    p1<-2*(1-pnorm(abs(summary(mod)$coefficients[coefName1,"Robust z"])))
+    p2<-2*(1-pnorm(abs(summary(mod)$coefficients[coefName2,"Robust z"])))
+    
+    if(p1<alpha){
+      res<-1
+    }else{
+      res<-0
+    }
+    
+    if(!is.null(coefName2)){
+      if(p2<alpha){
+        res<-c(res,1)
+      }else{
+        res<-c(res,0)
+      }
+    }
+    
+    return(res)
+  }
+}
+  
+  
+  # malaria infection; prevalence ~16%; try sample sizes 2000 and effect sizes 0.1, 0.2, 0.3
+  gr<-expand.grid(c(2000, 2500, 3000),c(6,9,12,15,18),c(0.2))
+  #gr<-expand.grid(c(2500),c(12),c(0.2))
+  datPow<-data.frame(
+    alpha=0.05,
+    malariaPrev=0.16,
+    effectSize=gr[,2],
+    n=gr[,1],
+    pDropOut=gr[,3],
+    powerShift=NA,
+    powerSlope=NA
+  )
+  
+  for(j in 1:nrow(datPow)){
+    cat(paste(sep="","## effectSize = ",datPow$effectSize[j],", n = ",datPow$n[j],", pDropOut = ",datPow$pDropOut[j]," ##\n"))
+    
+  
+    res<-foreach(i = 1:B) %dopar% {
+     
+      datSim<-simulateDataMalAb(n=datPow$n[j],prevBin=datPow$malariaPrev[j],abSD=30,abSlopeMonth=(2.5),iccSD=0.03,effectSize=datPow$effectSize[j],effectSizeSD=30,pDropOut=datPow$pDropOut[j],ageMin=8,ageMax=36)
+      tmp<-fitGEETestCoeff(dat=datSim,coefName1="exposureexposed",coefName2="agem8:exposureexposed",alpha=datPow$alpha[j])
+     
+      tmp
+    }
+    
+    tmp<-matrix(unlist(res),byrow=T,ncol=2)
+    resInt<-tmp[,1]
+    resSlp<-tmp[,2]
+    
+    datPow$powerShift[j]<-sum(resInt)/B
+    datPow$powerSlope[j]<-sum(resSlp)/B
+    cat(paste(sep="","power to detect a shift in ab = ",datPow$powerShift[j],", power to detect a change in ab-age slope = ",datPow$powerSlope[j]," [",datPow$effectSize[j],", ",datPow$n[j],", ",datPow$pDropOut[j],"]\n\n"))
+  }
+  
+datPowMalInfAb2 <- datPow
+export(datPow, here("data", "DawPowMalInf_Ab2.RData"))
+  
+
+```
+
+# Power curves
+```{r}
+  # produce power curves
+  ggplot(data=datPowMalInfAb2[datPowMalInfAb2$pDropOut==0.2,],mapping=aes(x=effectSize,y=powerShift,group=as.factor(n),color=as.factor(n))) +
+    geom_point(size=3) +
+    geom_line(lwd=1.5) +
+    geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
+    scale_color_manual(values=colorRampPalette(brewer.pal(8,"Spectral"))(length(levels(factor(datPow$n)))),name="Number of paired samples") +
+    scale_x_continuous(breaks = seq(0,20,1)) +
+    ylab("Power") +
+    xlab("Effect size (shift in average ab)") +
+    ggtitle("Power curves: Impact of malaria on NTS antibody responses, drop-out (20%)") +
+    theme(text=element_text(size=16)) +
+    theme_bw()
+
+```  
+
+# Example figures of simulated data generated
+
+```{r}
+
+  # produce a few example figures of data generated
+  c1<-col2rgb("steelblue")
+  c1<-rgb(c1[1],c1[2],c1[3],alpha=75,maxColorValue=255)
+  c2<-col2rgb("orange")
+  c2<-rgb(c2[1],c2[2],c2[3],alpha=75,maxColorValue=255)
+  
+  datSim<-simulateDataMalAb(n=1000,prevBin=0.16,abSD=30,abSlopeMonth=2.5,iccSD=0.03,effectSize=-12.5,effectSizeSD=30,pDropOut=0.2,ageMin=8,ageMax=36)
+  mod<-gee(ab~agem8*exposure,id=as.factor(pid),data=datSim[order(datSim$pid,datSim$visit),],corstr="exchangeable",na.action=na.omit)
+
+  
+  ggplot(data=datSim,aes(x=agem8,y=ab,col=exposure, group = pid)) +
+    geom_point() + 
+    geom_line() +
+    scale_color_manual(values=c(c1,c2)) +
+    geom_abline(lwd=1,intercept=coef(mod)["(Intercept)"]+coef(mod)["exposureexposed"],slope=coef(mod)["agem8"]+coef(mod)["agem8:exposureexposed"],col="orange") + 
+    geom_abline(lwd=1,intercept=coef(mod)["(Intercept)"],slope=coef(mod)["agem8"],col="steelblue") +
+    theme(legend.position = "right",
+        text=element_text(size=16)) +
+    xlab("Age in months") +
+    ylab("Antibody titre") +
+    ggtitle("Example results for one simulation: antibody responses with age by malaria exposure") +
+    theme_bw()
+
+```
+
+### Other risk factors
+
+The same approach was used to test other risk factors: anaemia, malnutrition, and sickle cell disease
+
+
