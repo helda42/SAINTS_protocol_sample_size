@@ -1,6 +1,6 @@
 ---
 title: "SAINTS - Sample size / power calculation - immunity with age"
-author: "Helen Dale"
+author: "Helen Dale & Marc Henrion"
 date: "11/07/2022"
 output: 
   html_document:
@@ -529,10 +529,10 @@ if(is.na(args[2]) | args[2]=="malaria"){
       pid<-datSim$pid[i]
       idx1<-which(datSim$pid==pid & datSim$visit==1)
       idx2<-which(datSim$pid==pid & datSim$visit==2)
-      datSim$ageSlopeEffectLimit[i]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx1]-0.5,datSim$age[i])
-
+      datSim$ageSlopeEffectLimit[idx2]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx2]-0.5,datSim$age[idx2])
+      #datSim$ageSlopeEffectLimit[idx1]<-datSim$age[idx1]
+      
     }
-    
     
     datSim$ab<-datSim$ab8m+datSim$u+(abSlopeMonth+datSim$v)*(datSim$ageSlopeEffectLimit-8)+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$exposure=="exposed",1,0)
     datSim$ab[datSim$visit==2 & rbinom(n=n,size=1,prob=pDropOut)==1]<-NA
@@ -569,7 +569,6 @@ if(is.na(args[2]) | args[2]=="malaria"){
   
   # malaria infection; prevalence ~16%; try sample sizes 2000 and effect sizes 0.1, 0.2, 0.3
   gr<-expand.grid(c(2000, 2500, 3000),c(6,9,12,15,18),c(0.2))
-  #gr<-expand.grid(c(2500),c(12),c(0.2))
   datPow<-data.frame(
     alpha=0.05,
     malariaPrev=0.16,
@@ -610,11 +609,11 @@ export(datPow, here("data", "DawPowMalInf_Ab2.RData"))
 # Power curves
 ```{r}
   # produce power curves
-  ggplot(data=datPowMalInfAb2[datPowMalInfAb2$pDropOut==0.2,],mapping=aes(x=effectSize,y=powerShift,group=as.factor(n),color=as.factor(n))) +
+ ggplot(data=datPowMalInfAb2[datPowMalInfAb2$pDropOut==0.2,],mapping=aes(x=effectSize,y=powerShift,group=as.factor(n),color=as.factor(n))) +
     geom_point(size=3) +
     geom_line(lwd=1.5) +
     geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
-    scale_color_manual(values=colorRampPalette(brewer.pal(8,"Spectral"))(length(levels(factor(datPow$n)))),name="Number of paired samples") +
+    scale_color_manual(values=c("steelblue","orange","red"),name="Number of samples") +
     scale_x_continuous(breaks = seq(0,20,1)) +
     ylab("Power") +
     xlab("Effect size (shift in average ab)") +
