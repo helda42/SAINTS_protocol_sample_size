@@ -68,7 +68,7 @@ if(is.na(args[2]) | args[2]=="malaria"){
       idx1<-which(datSim$pid==pid & datSim$visit==1)
       idx2<-which(datSim$pid==pid & datSim$visit==2)
       datSim$ageSlopeEffectLimit[idx2]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx2]-0.5,datSim$age[idx2])
-      datSim$ageSlopeEffectLimit[idx1]<-datSim$age[idx1]
+     # datSim$ageSlopeEffectLimit[idx1]<-datSim$age[idx1]
     }
     
     datSim$sba<-datSim$sba9m+datSim$u+(sbaSlopeMonth+datSim$v)*(datSim$ageSlopeEffectLimit-9)+rnorm(n=nrow(datSim),mean=effectSize,sd=effectSizeSD)*ifelse(datSim$exposure=="exposed",1,0)
@@ -149,13 +149,14 @@ ggplot(data=datPowMalInf[datPowMalInf$pDropOut==0.2,],mapping=aes(x=effectSize,y
   geom_point(size=2.5) +
   geom_line(lwd=1.5) +
   geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
-  scale_color_manual(values=colorRampPalette(brewer.pal(9,"Spectral"))(length(levels(factor(datPow$n)))),name="number of paired samples") +
+  scale_color_manual(values=c("steelblue","orange","red"),name="Number of paired samples") +
   ylab("power") +
   xlab("effect size (shift in average SBA)") +
   ggtitle("Power curves: Impact of malaria on SBA, prev (16%), drop-out (20%)") +
   theme(text=element_text(size=16)) +
   theme_bw()
 dev.off()
+
 
 # produce a few example figures of data generated
 c1<-col2rgb("steelblue")

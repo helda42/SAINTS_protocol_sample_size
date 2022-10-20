@@ -146,7 +146,8 @@ pdf(file="~/work/PhD/VacciNTS/Sample size/Vacc-iNTS_SampleSize_MalariaInfection_
     geom_point(size=3) +
     geom_line(lwd=1.5) +
     geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
-    scale_color_manual(values=colorRampPalette(brewer.pal(8,"Spectral"))(length(levels(factor(datPow$n)))),name="Number of paired samples") +
+    #scale_color_manual(values=colorRampPalette(brewer.pal(8,"Spectral"))(length(levels(factor(datPow$n)))),name="Number of paired samples") +
+    scale_color_manual(values=c("steelblue","orange","red"),name="Number of samples") +
     scale_x_continuous(breaks = seq(0,20,1)) +
     ylab("Power") +
     xlab("Effect size (shift in average ab)") +
@@ -160,6 +161,8 @@ pdf(file="~/work/PhD/VacciNTS/Sample size/Vacc-iNTS_SampleSize_MalariaInfection_
   c1<-rgb(c1[1],c1[2],c1[3],alpha=75,maxColorValue=255)
   c2<-col2rgb("orange")
   c2<-rgb(c2[1],c2[2],c2[3],alpha=75,maxColorValue=255)
+  c3<-col2rgb("red")
+  c3<-rgb(c3[1],c3[2],c3[3],alpha=75,maxColorValue=255)
   
   pdf(file="Vacc-iNTS_SampleSize_MalariaInfection_n1000_es0.1_pDO0.2.pdf",width=16,height=9)
   datSim<-simulateDataMalAb(n=1000,prevBin=0.16,abSD=30,abSlopeMonth=2.5,iccSD=0.03,effectSize=-12.5,effectSizeSD=30,pDropOut=0.2,ageMin=8,ageMax=36)
