@@ -149,7 +149,7 @@ export(datPowMalInf, here("data", "datPowMalInf.RData"))
 
 
 
-## 1. Power for detecting change in SBA due to malaria infection
+# 1. Power for detecting change in SBA due to malaria infection
 
 ## Common assumptions
 
@@ -221,7 +221,7 @@ ggplot(data=datSim,aes(x=agem9,y=sba,col=exposure,group=pid)) +
   geom_point() + 
   geom_line() +
   scale_color_manual(values=c(c1,c2)) +
-  geom_abline(lwd=2,intercept=coef(mod)["(Intercept)"]+coef(mod)["exposureexposed"],slope=coef(mod)["agem9"]+coef(mod)["agem9:exposureexposed"],col="orange") + 
+  geom_abline(lwd=1,intercept=coef(mod)["(Intercept)"]+coef(mod)["exposureexposed"],slope=coef(mod)["agem9"]+coef(mod)["agem9:exposureexposed"],col="orange") + 
   geom_abline(lwd=2,intercept=coef(mod)["(Intercept)"],slope=coef(mod)["agem9"],col="steelblue") +
   theme(legend.position = "right",
         text=element_text(size=16)) +
@@ -232,7 +232,7 @@ ggplot(data=datSim,aes(x=agem9,y=sba,col=exposure,group=pid)) +
 
 ```
 
-### Results
+## Results
 
 As the graph below shows, with 2,500 paired samples (blue line), the study would be quite well powered to detect in shifts in SBA of 0.25 or more.
 
@@ -255,7 +255,7 @@ ggplot(data=datPow[datPow$pDropOut==0.2,],mapping=aes(x=effectSize,y=powerShift,
 The change in slope implied by the way the data was generated (basically if you have malaria at the time of the first measurement, you stop having the benefit of improving SBA via aging) is quite small and power to detect this is very low (the maximum reported power across any scenario was `r 100*max(datPow$powerSlope)`%).
 
 
-## 2. Power for detecting change in SBA due to malaria vaccination
+### 2. Power for detecting change in SBA due to malaria vaccination
 
 ```{r, include=FALSE}
 ## Dataset simulation
@@ -402,13 +402,13 @@ Considering the following diagram about direct, indirect, overall and total vacc
 
 * Malaria prevalence in Southern Malawi: $p_{mal}=26\%$ (children 6-60 monhts; [MIS 2017](https://dhsprogram.com/pubs/pdf/MIS28/MIS28.pdf), p.43 Fig 4.4)
 
-* Vaccination coverage in the vaccine cluster is 60% (I recall that's the number Donnie mentioned on the call; need to confirm).
+* Vaccination coverage in the vaccine cluster is 60%
 
 * Malaria RTS,S/AS01 VE in children 5-17 months, 18 months after vaccination = 42-50% ([10.1371/journal.pmed.1001685](https://doi.org/10.1371/journal.pmed.1001685)). This is the direct VE. 
 
 * $VE = 1-\lambda_v/\lambda_c$ where $\lambda_v,\lambda_c$ are the incidences in vaccinated and control populations. We work with a prevalence here. However: if we assume that malaria infection has a relatively short duration, that the vaccine does not shorten or lengthen the duration of the infection episode, then a drop in incidence of X% must also result in a drop in prevalence of X%. We therefore assume the direct effect of the vaccine results in a 42-50% reduction in malaria prevalence.
 
-* Indirect effect: Assumption this is 10% (NO DATA TO SUPPORT THIS)
+* Indirect effect: Assumption this is 10% 
 
 * Balanced sampling from the vaccinated and unvaccinated clusters.
 
@@ -427,7 +427,7 @@ $$SBA_{i,j}=\beta_0+\beta_1\cdot(age_{i,j}-1)+\beta_2 \cdot malaria_{i,j}+\beta_
 The main focus of the analysis would be to test $H_0:\beta_5=0$ vs $H_1:\beta_5\neq 0$; the direct effect of malaria vaccine on SBA. A secondary focus would be to test $\beta_4$, the indirect effect on SBA.
 
 
-### Results
+## Results
 
 Power is reduced. However we still reach just about 80% power for large effects of malaria infection on SBA (1 unit change) and assuming 50% vaccine efficacy of RTS,S/AS01. While this is an exploratory aim, we have still adequate power for the upper end of realistic scenarios.
 
@@ -448,7 +448,7 @@ ggplot(data=datPowMalVacc,mapping=aes(x=effectSize,y=powerDir,group=factor(dirVE
 
 ```
 
-### 3. Detecting changes in Antibody titre by malaria status
+# 3. Detecting changes in Antibody titre by malaria status
 
 Using the same approach as was taken for the SBA change by malaria infection
 
@@ -529,6 +529,7 @@ if(is.na(args[2]) | args[2]=="malaria"){
       pid<-datSim$pid[i]
       idx1<-which(datSim$pid==pid & datSim$visit==1)
       idx2<-which(datSim$pid==pid & datSim$visit==2)
+      #datSim$ageSlopeEffectLimit[i]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx1]-0.5,datSim$age[i])
       datSim$ageSlopeEffectLimit[idx2]<-ifelse(datSim$exposure[idx1]=="exposed",datSim$age[idx2]-0.5,datSim$age[idx2])
       #datSim$ageSlopeEffectLimit[idx1]<-datSim$age[idx1]
       
@@ -606,7 +607,7 @@ export(datPow, here("data", "DawPowMalInf_Ab2.RData"))
 
 ```
 
-# Power curves
+### Power curves
 ```{r}
   # produce power curves
  ggplot(data=datPowMalInfAb2[datPowMalInfAb2$pDropOut==0.2,],mapping=aes(x=effectSize,y=powerShift,group=as.factor(n),color=as.factor(n))) +
@@ -623,7 +624,7 @@ export(datPow, here("data", "DawPowMalInf_Ab2.RData"))
 
 ```  
 
-# Example figures of simulated data generated
+### Example figures of simulated data generated
 
 ```{r}
 
