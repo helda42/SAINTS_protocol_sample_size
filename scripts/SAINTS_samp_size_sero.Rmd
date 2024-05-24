@@ -2,19 +2,24 @@
 title: "SAINTS - Sample size / power calculation - seroprevalance and seroincidence"
 author: "Helen Dale"
 date: "2022-09-05"
-output: 
-  html_document:
+output:
+  pdf_document: default
     code_folding: hide
+classoption: landscape
+
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, rsuslts='hide', fig.width=16, fig.height=9)
+```{r setup, results='hide', message=F, warning=F}
+# options(width = 60)
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, results=F, fig.width=16, fig.height=9)
 
 library(png)
 library(tidyverse)
 library(ggplot2)
 library(pwr)
 library(RColorBrewer)
+library(longpower)
+
 ## Simulate dataset for serosurveys
 
 x<-seq(0,1,by=0.01)
@@ -34,7 +39,7 @@ moeAlt2<-rep(NA,length(x))
 n<-200
 nAlt1<-100
 nAlt2<-400
-nSim<-1e5
+nSim<-1e3
 
 for(i in 1:length(x)){
     print(paste(sep="/",i,length(x)))
@@ -85,17 +90,24 @@ par(mfrow=c(1,2))
 plot(x,y,xlab="prevalence",ylab="estimated prevalence",col="black",type="l",lwd=2,asp=1,main="n=200")
 
 tmpCol<-col2rgb("steelblue")
-polygon(x=c(x,x[length(x):1]),y=c(yl,yu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200),border=NA)
+polygon(x=c(x,x[length(x):1]),y=c(yl,yu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],
+                                                              green=tmpCol[2],blue=tmpCol[3],alpha=200),border=NA)
 lines(x,y,col="black",lwd=2)
 
-legend(x="bottomright",lty=c(1,1),lwd=c(2,10),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200)),legend=c("estimate","95% confidence interval"))
+legend(x="bottomright",lty=c(1,1),lwd=c(2,10),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],
+                                                                alpha=200)),legend=c("estimate","95% confidence interval"))
 
 plot(x,moe,col="black",type="l",lwd=2,main="n=200",xlab="prevalence",ylab="margin of error")
 par(xpd=T)
 tmpCol<-col2rgb("steelblue")
-polygon(x=c(x,x[length(x):1]),y=c(moel,moeu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200),border=NA)
+polygon(x=c(x,x[length(x):1]),y=c(moel,moeu[length(x):1]),col=rgb(maxColorValue=255,red=tmpCol[1],
+                                                                  green=tmpCol[2],
+                                                                  blue=tmpCol[3],
+                                                                  alpha=200),
+        border=NA)
 lines(x,moe,col="black",lwd=2)
-legend(x="topright",lty=c(1,1),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200)),lwd=c(2,10),legend=c("margin of error","95% confidence interval"))
+legend(x="topright",lty=c(1,1),col=c("black",rgb(maxColorValue=255,red=tmpCol[1],green=tmpCol[2],blue=tmpCol[3],alpha=200)),
+       lwd=c(2,10),legend=c("margin of error","95% confidence interval"))
 
 ```
 
@@ -115,7 +127,6 @@ As before, we will use ready formulas (now for comparing proportions between 2 g
 ### Results
 
 ```{r}
-
 gr<-expand.grid(seq(1000,2500,by=100),c(0.1,0.15,0.2,0.25),c(0.2,0.3,0.4,0.5),c(1/24,0.074,0.08,0.099))
 
 datPowSeroConv<-data.frame(
@@ -139,7 +150,8 @@ datPowSeroConv$n2<-round((1-datPowSeroConv$prev)*datPowSeroConv$nTotComp)
 datPowSeroConv$p1p2<-factor(paste(sep="","p1 = ",datPowSeroConv$p1,", p2 = ",datPowSeroConv$p2))
 
 for(j in 1:nrow(datPowSeroConv)){
-  datPowSeroConv$power[j]<-pwr.2p2n.test(h=ES.h(p1=datPowSeroConv$p1[j],p2=datPowSeroConv$p2[j]),n1=datPowSeroConv$n1[j],n2=datPowSeroConv$n2[j])$power
+  datPowSeroConv$power[j]<-pwr.2p2n.test(h=ES.h(p1=datPowSeroConv$p1[j],p2=datPowSeroConv$p2[j]),
+                                         n1=datPowSeroConv$n1[j],n2=datPowSeroConv$n2[j])$power
 }
 
 ```
@@ -152,14 +164,20 @@ Note that the sample sizes go up to 2,500 on the graph below. The vertical dashe
 ggplot(data=datPowSeroConv[datPowSeroConv$prev==0.08,],mapping=aes(x=nTot,y=power,group=p1p2,color=p1p2)) +
   geom_point(size=2) +
   geom_line(lwd=1) +
-  scale_color_manual(values=colorRampPalette(brewer.pal(9,"Spectral"))(length(levels(datPowSeroConv$p1p2))),name="prop. seroconverted in each group") +
+  scale_color_manual(values=colorRampPalette(brewer.pal(9,"Spectral"))(length(levels(datPowSeroConv$p1p2))),
+                     name="prop. seroconverted in each group") +
   geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
   geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
-  theme(legend.position = "right",text=element_text(size=16)) +
-  xlab("number of paired samples") +
-  ylab("power") +
-  ggtitle("Power curves for different combinations of 3-month seroconversion rates. Prevalence of exposure = 8%, drop-out = 20%.") +
-  theme_bw()
+  xlab("Number of paired samples") +
+  ylab("Power") +
+  ggtitle("Power curves for different combinations of 3-month seroconversion rates. Prev. of exposure = 8%, drop-out = 20%.") +
+  theme_bw() +
+  theme(
+    legend.position = "right",
+    title = element_text(face = "bold", size = 16),
+    axis.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 14)
+  )
 ```
 
 ## 3. Power for detecting change in SBA due to Salmonella exposure
@@ -203,7 +221,8 @@ datPowSalm$n2<-round((1-datPowSalm$prev)*datPowSalm$nTotComp)
 datPowSalm$es<-round(digits=2,datPowSalm$delta/datPowSalm$sd)
 
 for(j in 1:nrow(datPowSalm)){
-  datPowSalm$power[j]<-pwr.t2n.test(n1=datPowSalm$n1[j],n2=datPowSalm$n2[j],d=datPowSalm$es[j],sig.level=datPowSalm$alpha[j])$power
+  datPowSalm$power[j]<-pwr.t2n.test(n1=datPowSalm$n1[j],n2=datPowSalm$n2[j],d=datPowSalm$es[j],
+                                    sig.level=datPowSalm$alpha[j])$power
 }
 
 datPowSalm$EsSd<-factor(paste(sep="","ES = ",datPowSalm$delta,", SD = ",datPowSalm$sd))
@@ -214,22 +233,121 @@ As the results below show, power is quite high (`r round(digits=2,100*datPowSalm
 
 For smaller effect sizes (difference of 0.1 in SBA) power is lower (see graph).
 
-Note that the sample sizes go up to 2,500 on the graph below. The vertical dashed grey line indicates the 2,000 individuals that are planned to be recruited.
+Note that the sample sizes go up to 2,500 on the graph below. 
 
 ```{r}
 ggplot(data=datPowSalm[datPowSalm$prev==0.08,],mapping=aes(x=nTot,y=power,group=EsSd,color=EsSd)) +
   geom_point(size=2) +
   geom_line(lwd=1) +
   scale_color_manual(values=c("steelblue","greenyellow","salmon","orange"),name="effect size and std. dev.") +
-  geom_hline(yintercept=0.8,lwd=2,lty=2,col="darkgrey") + 
-  geom_vline(xintercept=2000,lwd=2,lty=2,col="darkgrey") +
+  geom_hline(yintercept=0.8,lwd=1,lty=2,col="darkgrey") + 
+  geom_vline(xintercept=2000,lwd=1,lty=2,col="darkgrey") +
   theme(legend.position = "right",text=element_text(size=16)) +
-  xlab("number of paired samples") +
-  ylab("power") +
+  xlab("Number of paired samples") +
+  ylab("Power") +
   ggtitle("Power curves for different effect sizes. Prevalence of exposure = 8%, drop-out = 20%.")+
-  theme_bw()
+  theme_bw() +
+  theme(
+    title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold", size = 12),
+    axis.text = element_text(size = 12)
+  )
 
 ```
 
+
+## 4. Sample size for longitudinal sample subset average rate of SBA change between two groups (difference in slopes)
+
+### Community Longitudinal Cohort and Hospital Cases Cohort
+This is an exploratory end-point, to provide pilot estimates for future studies due to limited existing data. We can allow a large difference in SBA change over the 12 month period on 0.75.
+The same calculation will be used for both longitudinal cohorts:
+1. Comparision of SBA in children with invasive NTS disease compared to healthy community controls
+2. Comparison of SBA in children with known malaria exposure (MRDT+) compared to no recorded malaria exposure (MRDT-)
+
+### Assumptions
+From raw longitudinal data used in T.Nyirenda Thesis, "NATURAL IMMUNITY TO SALMONELLA IN HUMANS" (2015), using data for children 6 months - 36 months (linear increase in SBA acquisition with age)
+Linear Mixed model with random effects (lmer function in lme4 package), yields the following parameters:
+Variance of random intercept $\sigma^2_i = 0.299$
+Variance of random slope $\sigma^2_s = 0.00148$   
+Random effects residual variance $\sigma^2_e = 1.226$  
+Time for follow-up 12 months (5 visits at 0,3,6,9,12 months)
+
+
+### Methods
+Using the "longpower" package using the "diggle.linear.power" function sample size calculation for difference in slopes between two groups, as per Diggle P.J., Heagerty P.J., Liang K., Zeger S.L. (2002) Analysis of longitudinal data. Second Edition. Oxford Statistical Science Series.
+
+```{r}
+
+sig2.i <- 0.299   # var of random intercept
+sig2.s <- 0.00148   # var of random slope
+sig2.e <- 1.226  # residual var
+cov.s.i <- 0.8*sqrt(sig2.i)*sqrt(sig2.s)  # covariance of slope and intercept
+
+cov.t <- function(t1, t2, sig2.i, sig2.s, cov.s.i){
+  sig2.i + t1*t2*sig2.s + (t1+t2)*cov.s.i 
+}
+
+t = seq(0,1.5,0.25)   # study visit times
+n <- length(t)
+R <- outer(t, t, function(x,y){cov.t(x,y, sig2.i, sig2.s, cov.s.i)})
+R <- R + diag(sig2.e, n, n)
+
+diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.80)   # Diggle 2002 (difference in slopes)
+p50 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.50)   
+p60 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.60)   
+p70 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.70)   
+p80 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.80)   
+p90 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.90)   
+p95 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.95)   
+p97 <- diggle.linear.power(d=0.75, t=t, R=R, sig.level=0.05, power=0.97)
+
+power_curve <- data.frame(
+  power = c(50,60,70,80,90,95,97), 
+  sample_size = c(p50$N,p60$N,p70$N,p80$N,p90$N,p95$N,p97$N)
+  )
+
+ggplot(power_curve, aes(x=sample_size, y=power)) +
+  geom_point()+
+  geom_line(col="blue")+
+  #geom_smooth(df=2)+
+  ggtitle("Power Curve for Longitudinal Cohort SBA (Change of 0.75)")+
+  xlab("Sample Size")+
+  ylab("Power") +
+  geom_hline(yintercept=80,lwd=1,lty=2,col="red") + 
+  geom_vline(xintercept=39.18,lwd=1,lty=2,col="red") +
+  scale_x_continuous(breaks = seq(20,80,5))+
+  theme_bw() +
+  theme(
+    title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold", size = 12),
+    axis.text = element_text(size = 12)
+  )
+
+```
+
+### With unbalanced design (Malaria prevalance=0.26)
+
+```{r, results=T}
+tab3 <- data.frame(cbind(
+  rho = rep(c(0.0, 0.3, 0.5, 0.8), 2),
+  pi1 = c(rep(0.74, 4), rep(0.3, 4))))
+m <- c()
+for(i in 1:nrow(tab3)){
+  R <- matrix(tab3$rho[i], nrow = 4, ncol = 4)
+  diag(R) <- 1
+  m <- c(m, ceiling(liu.liang.linear.power(
+    delta=0.75,
+    u = list(u1 = rep(1, 4), # treatment
+             u2 = rep(0, 4)), # control       
+    v = list(v1 = rep(1, 4), v2 = rep(1, 4)), # intercept
+    sigma2=1,
+    Pi = c(tab3$pi1[i], 1-tab3$pi1[i]),
+    R=R, alternative="two.sided",
+    power=0.80)$N))
+}
+tab3d <- cbind(tab3, m)
+flextable::flextable(tab3d)
+
+```
 
 
